@@ -371,7 +371,7 @@
 
 <script>
 /* ============================================================
-   CONFIG — paste your Microsoft Form / endpoint here
+CONFIG — results are sent to Supabase (database)
 ============================================================ */
 const SUBMIT_CONFIG = {
   supabaseUrl: "https://rzpbqnjldxivwgjcjdpl.supabase.co",
@@ -1055,7 +1055,7 @@ let _backupId = null;
 /* ============================================================
    BACKUP ENGINE — local durable store (IndexedDB) + retry queue.
    Every finished game is saved locally FIRST, so no result is ever
-   lost even if the network / Power Automate is down. Scales far
+   lost even if the network is down. Scales far
    beyond 500 players (IndexedDB holds tens of thousands of rows).
 ============================================================ */
 const DB_NAME='dxquest_backup', STORE='results';
@@ -1176,7 +1176,6 @@ function downloadCSV(){
 
 
 
-// Open the player's mail app with everything pre-filled (mailto).
 
 // ============================================================
 //  PLAY-ONCE LOCK
@@ -1428,7 +1427,7 @@ async function renderAdmin(){
   const tbl=el('admTable');
   if(!rows.length){
     tbl.innerHTML='<tr><td class="admin-empty">'+(lang==='th'?'ยังไม่มีข้อมูลผู้เล่นในเครื่องนี้':'No player data on this device yet')+'</td></tr>';
-    // hide resend if no webhook
+    // hide resend if Supabase not configured
     el('admResend').style.display = SUBMIT_CONFIG.supabaseUrl ? '' : 'none';
     return;
   }
