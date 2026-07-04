@@ -376,10 +376,14 @@
 ============================================================ */
 const SUBMIT_CONFIG = {
   // =========================================================
-  //  HOW TO SEND RESULTS AUTOMATICALLY (Microsoft 365)
-  //  Paste your Power Automate URL below. That's the only edit needed.
-  //  Full setup guide is in the file: HOW_TO_COLLECT_RESULTS.md
+  //  RESULT DESTINATIONS (priority: Supabase -> Power Automate -> MS Form)
   // =========================================================
+
+  // ----- Supabase (recommended: silent auto-send, no score tampering) -----
+  // REST endpoint = <project-url>/rest/v1/<table>
+  supabaseUrl: "https://rzpbqnjldxivwgjcjdpl.supabase.co",
+  supabaseKey: "sb_publishable_gz1GltRJgfnhmNv6WEBOtw_tKn1pCO1",
+  supabaseTable: "game_results",
 
   // Power Automate "When an HTTP request is received" trigger URL.
   // Looks like: https://prod-XX.westus.logic.azure.com:443/workflows/..../triggers/manual/paths/invoke?...&sig=....
@@ -713,7 +717,7 @@ const STAGES = [
         whyWrong:{th:"สูตรผลิตและเทคโนโลยีเฉพาะต้องใช้ <b>Close Strategy</b>",
                   en:"Proprietary formulas and technologies should be protected through a <b>Close Strategy</b>."} },
       { lead:{th:"สถานการณ์:",en:"Scenario:"},
-        body:{th:"“ร่วมมือข้ามสายงานภายในองค์กร และจับมือพันธมิตรภายนอกเพื่อเพิ่มขีดความสามารถรวม” — กลยุทธ์ใด?",
+        body:{th:"“ร่วมมือข้ามสายงานภายในองค์กร และจับมือพันธมิตรภายนอกเพื่อเพิ่มขีดความสามารถรวม” — สะท้อนกลยุทธ์ใด?",
               en:"\"Cross-functional collaboration inside plus external partnerships to boost collective capability\" — which strategy?"},
         options:[{th:"กลยุทธ์แบบปิด",en:"Close Strategy"},
                  {th:"กลยุทธ์แบบเปิด",en:"Open Strategy"},
@@ -783,6 +787,7 @@ const STAGES = [
                   en:"Reconsider — aminoVITAL Run, iLiveWell and AminoMOF are all <b>DX 4.0</b> health activities, while the Cassava-farmer platform is agricultural, so it does NOT belong."} }
     ]}
 ];
+
 
 const TOTAL_Q = STAGES.reduce((s,st)=>s+st.questions.length,0);
 // Waypoints on the adventure map, as {x,y} in %. Journey climbs bottom -> top.
@@ -1319,6 +1324,48 @@ async function sendToWebhook(payload, silent){
   }
 }
 
+// Send to Supabase (REST). Silent, server-stored, player cannot tamper with the score.
+// publishable/anon key goes in BOTH apikey and Authorization headers (same value),
+// which is the supported way for the new sb_publishable_ keys.
+async function sendToSupabase(payload, silent){
+  const status = el('submitStatus');
+  if(!silent){ status.className='submit-status'; status.textContent=T().submitting; }
+  const url = SUBMIT_CONFIG.supabaseUrl.replace(/\/+$/,'') + '/rest/v1/' + SUBMIT_CONFIG.supabaseTable;
+  const row = {
+    name: payload.name,
+    department: payload.dept,
+    location: payload.location,
+    score: payload.score,
+    correct_answers: payload.correct,
+    lang: payload.lang
+  };
+  try{
+    const res = await fetch(url, {
+      method:'POST',
+      headers:{
+        'apikey': SUBMIT_CONFIG.supabaseKey,
+        'Authorization': 'Bearer ' + SUBMIT_CONFIG.supabaseKey,
+        'Content-Type':'application/json',
+        'Prefer':'return=minimal'
+      },
+      body: JSON.stringify(row)
+    });
+    if(!res.ok){ throw new Error('HTTP '+res.status); }
+    resultSent = true;
+    if(_backupId!=null){
+      const rows=await dbAll(); const r=rows.find(x=>x.id===_backupId);
+      if(r){ r.sent=true; await dbUpdate(r); }
+    }
+    status.className='submit-status ok';
+    status.textContent = T().submitOk;
+    el('submitBtn').disabled = true;
+    return true;
+  }catch(e){
+    if(!silent){ status.className='submit-status err'; status.textContent = T().submitErr; }
+    return false;
+  }
+}
+
 // Called automatically when the finale appears (if autoSend is on).
 let _backupDone = false;
 async function autoSendResult(){
@@ -1327,14 +1374,20 @@ async function autoSendResult(){
   const payload = buildPayload();
   // 1) ALWAYS save a local backup first (durable, offline-proof)
   try{ _backupId = await backupSave(payload, false); }catch(e){ _backupId=null; }
-  // 2) show a gentle "backed up" note if we won't auto-send
+  // 2) show a gentle "backed up" note if nothing is configured to auto-send
   const status = el('submitStatus');
-  if(!SUBMIT_CONFIG.webhookUrl){
+  const canAuto = SUBMIT_CONFIG.supabaseUrl || SUBMIT_CONFIG.webhookUrl;
+  if(!canAuto){
     status.className='submit-status ok'; status.textContent=T().savedLocal;
   }
-  // 3) try to send online (if configured + autoSend)
-  if(SUBMIT_CONFIG.webhookUrl && SUBMIT_CONFIG.autoSend && !resultSent){
-    sendToWebhook(payload, true);
+  // 3) try to send online silently (priority: Supabase -> Power Automate)
+  if(SUBMIT_CONFIG.autoSend && !resultSent){
+    if(SUBMIT_CONFIG.supabaseUrl && SUBMIT_CONFIG.supabaseKey){
+      const ok = await sendToSupabase(payload, true);
+      if(!ok && SUBMIT_CONFIG.webhookUrl){ sendToWebhook(payload, true); }
+    } else if(SUBMIT_CONFIG.webhookUrl){
+      sendToWebhook(payload, true);
+    }
   }
 }
 
@@ -1345,7 +1398,14 @@ async function submitResult(){
   // make sure there is a local backup even if autoSend was off
   if(_backupId==null){ try{ _backupId=await backupSave(payload,false);}catch(e){} }
 
-  // Primary path: Power Automate webhook
+  // Primary path: Supabase (silent, server-stored)
+  if(SUBMIT_CONFIG.supabaseUrl && SUBMIT_CONFIG.supabaseKey){
+    const ok = await sendToSupabase(payload, false);
+    if(ok) return;
+    // if Supabase failed, fall through to other options
+  }
+
+  // Next: Power Automate webhook
   if(SUBMIT_CONFIG.webhookUrl){
     await sendToWebhook(payload, false);
     return;
