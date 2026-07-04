@@ -167,8 +167,6 @@
   .btn-primary{background:linear-gradient(180deg,var(--moss),#1d9e74);color:#04241a;box-shadow:0 8px 20px rgba(52,211,153,.3)}
   .btn-primary:hover{transform:translateY(-2px)}
   .btn-ghost{background:none;border:1px solid rgba(255,255,255,.25);color:var(--parchment)}
-  .btn-mail{background:linear-gradient(180deg,var(--amethyst),var(--mana-deep));color:#fff;box-shadow:0 8px 20px rgba(155,108,255,.3)}
-  .btn-mail:hover{transform:translateY(-2px)}
   .btn-ghost:hover{border-color:var(--rune-glow);color:var(--rune-glow)}
   .btn:focus-visible{outline:3px solid var(--mana);outline-offset:2px}
   .submit-status{margin-top:14px;font-size:13px;min-height:18px}
@@ -497,7 +495,6 @@ const UI = {
     submit:"ส่งผลให้ทีมงาน ⤴", replay:"↻ เล่นใหม่",
     lockedTitle:"คุณเล่นเกมนี้ไปแล้ว", lockedText:"เกมนี้เล่นได้เพียงครั้งเดียวต่อผู้เล่น ขอบคุณที่ร่วมสนุก!",
     submitting:"กำลังส่งผล...", submitOk:"ส่งผลสำเร็จ! ขอบคุณค่ะ 🎉",
-    submitOpened:"เปิดฟอร์มสำหรับส่งผลแล้ว กรุณากด Submit ในฟอร์ม",
     submitErr:"ส่งออนไลน์ไม่สำเร็จ แต่บันทึกสำรองในเครื่องแล้ว ✓ ลองส่งใหม่ได้",
     savedLocal:"บันทึกผลสำรองในเครื่องแล้ว ✓",
     admin:"🗄️ ข้อมูลผู้เล่น (Backup)",
@@ -505,14 +502,11 @@ const UI = {
     adminCount:(n)=>"เก็บผลผู้เล่นแล้ว "+n+" รายการ",
     adminPending:(n)=>n+" รายการยังไม่ได้ส่งออนไลน์",
     exportCsv:"⬇ ดาวน์โหลด Excel/CSV",
-    emailBtn:"✉ ส่งผลทางอีเมล",
-    emailOpened:"เปิดอีเมลแล้ว กรุณากด Send ในโปรแกรมเมล ✓",
     resendAll:"↻ ส่งที่ค้างทั้งหมด",
     clearAll:"🗑 ล้างข้อมูลในเครื่อง",
     clearConfirm:"ยืนยันล้างข้อมูลสำรองทั้งหมดในเครื่องนี้? (ข้อมูลบน Excel กลางไม่ถูกลบ)",
     adminClose:"ปิด",
     resent:(n)=>"ส่งสำเร็จ "+n+" รายการ",
-    notConfigured:"ยังไม่ได้ตั้งค่าปลายทางสำหรับส่งผล (ดูคำแนะนำในไฟล์)"
   },
   en:{
     mana:"Mana",
@@ -535,7 +529,6 @@ const UI = {
     submit:"Send my result ⤴", replay:"↻ Play again",
     lockedTitle:"You have already played", lockedText:"This game can be played only once per person. Thank you for joining!",
     submitting:"Sending result...", submitOk:"Result sent! Thank you 🎉",
-    submitOpened:"The submission form is now open — please press Submit there.",
     submitErr:"Online send failed, but saved locally ✓. You can retry.",
     savedLocal:"Result backed up on this device ✓",
     admin:"🗄️ Player data (Backup)",
@@ -543,14 +536,11 @@ const UI = {
     adminCount:(n)=>n+" player results stored",
     adminPending:(n)=>n+" not yet sent online",
     exportCsv:"⬇ Download Excel/CSV",
-    emailBtn:"✉ Email my result",
-    emailOpened:"Mail app opened — please press Send ✓",
     resendAll:"↻ Resend all pending",
     clearAll:"🗑 Clear local data",
     clearConfirm:"Clear ALL local backup on this device? (The central Excel is not affected.)",
     adminClose:"Close",
     resent:(n)=>n+" sent successfully",
-    notConfigured:"No submission endpoint is configured yet (see instructions in the file)."
   }
 };
 
@@ -1143,16 +1133,19 @@ async function backupSave(payload, sent){
 
 // Try to (re)send any locally-stored rows that haven't been sent online yet.
 async function resendPending(silent){
-  if(!SUBMIT_CONFIG.webhookUrl) return 0;
+  if(!SUBMIT_CONFIG.supabaseUrl || !SUBMIT_CONFIG.supabaseKey) return 0;
   const rows = await dbAll();
+  const url = SUBMIT_CONFIG.supabaseUrl.replace(/\/+$/,'') + '/rest/v1/' + SUBMIT_CONFIG.supabaseTable;
   let ok=0;
   for(const r of rows){
     if(r.sent) continue;
     try{
-      await fetch(SUBMIT_CONFIG.webhookUrl,{method:'POST',mode:'no-cors',
-        headers:{'Content-Type':'text/plain;charset=UTF-8'},
-        body: JSON.stringify(stripMeta(r))});
-      r.sent=true; await dbUpdate(r); ok++;
+      const res = await fetch(url,{method:'POST',
+        headers:{'apikey':SUBMIT_CONFIG.supabaseKey,'Authorization':'Bearer '+SUBMIT_CONFIG.supabaseKey,
+                 'Content-Type':'application/json','Prefer':'return=minimal'},
+        body: JSON.stringify({name:r.name,department:r.dept,location:r.location,
+                              score:r.score,correct_answers:r.correct,lang:r.lang})});
+      if(res.ok){ r.sent=true; await dbUpdate(r); ok++; }
     }catch(e){ /* still offline; leave pending */ }
   }
   return ok;
@@ -1182,36 +1175,8 @@ function downloadCSV(){
 }
 
 
-// Build a readable email body from the current result.
-function buildEmailBody(){
-  const p = buildPayload();
-  const L = (lang==='th');
-  const lines = [
-    (L?'ผลการเล่นเกม DX Guidebook':'DX Guidebook Game Result'),
-    '--------------------------------',
-    (L?'ชื่อ-นามสกุล':'Name-Surname')+': '+p.name,
-    (L?'แผนกและชั้น':'Department & Floor')+': '+p.dept,
-    (L?'สังกัด':'Location')+': '+p.location,
-    (L?'คะแนน':'Score')+': '+p.score+' / '+p.maxScore,
-    (L?'ตอบถูก':'Correct')+': '+p.correctText+' ('+p.percent+'%)',
-    (L?'เวลา':'Time')+': '+p.timestamp,
-    '--------------------------------',
-    'Eat Well, Live Well. | Ajinomoto'
-  ];
-  return lines.join('\n');
-}
 
 // Open the player's mail app with everything pre-filled (mailto).
-function emailResult(){
-  const to = encodeURIComponent(SUBMIT_CONFIG.emailTo||'');
-  const subj = encodeURIComponent(SUBMIT_CONFIG.emailSubject||'Game Result- DX Guidebook game');
-  const body = encodeURIComponent(buildEmailBody());
-  const href = 'mailto:'+to+'?subject='+subj+'&body='+body;
-  // use a temporary anchor for best compatibility
-  const a=document.createElement('a'); a.href=href; document.body.appendChild(a); a.click(); a.remove();
-  const status=el('submitStatus');
-  status.className='submit-status ok'; status.textContent=T().emailOpened;
-}
 
 // ============================================================
 //  PLAY-ONCE LOCK
@@ -1266,37 +1231,6 @@ function buildPayload(){
   };
 }
 
-// Send to Power Automate. Uses text/plain + no-cors so the browser sends a
-// "simple" request with NO preflight (the HTTP trigger returns no CORS headers,
-// so we fire-and-forget: we can't read the response, but the data still arrives).
-async function sendToWebhook(payload, silent){
-  const status = el('submitStatus');
-  if(!silent){ status.className='submit-status'; status.textContent=T().submitting; }
-  try{
-    await fetch(SUBMIT_CONFIG.webhookUrl, {
-      method:'POST',
-      mode:'no-cors',
-      headers:{'Content-Type':'text/plain;charset=UTF-8'},
-      body: JSON.stringify(payload)
-    });
-    resultSent = true;
-    // flip the local backup row to sent = true
-    if(_backupId!=null){
-      const rows=await dbAll();
-      const row=rows.find(r=>r.id===_backupId);
-      if(row){ row.sent=true; await dbUpdate(row); }
-    }
-    status.className='submit-status ok';
-    status.textContent = T().submitOk;
-    el('submitBtn').disabled = true;
-    return true;
-  }catch(e){
-    status.className='submit-status err';
-    status.textContent = T().submitErr;  // note: already backed up locally
-    return false;
-  }
-}
-
 // Send to Supabase (REST). Silent, server-stored, player cannot tamper with the score.
 // publishable/anon key goes in BOTH apikey and Authorization headers (same value),
 // which is the supported way for the new sb_publishable_ keys.
@@ -1349,18 +1283,13 @@ async function autoSendResult(){
   try{ _backupId = await backupSave(payload, false); }catch(e){ _backupId=null; }
   // 2) show a gentle "backed up" note if nothing is configured to auto-send
   const status = el('submitStatus');
-  const canAuto = SUBMIT_CONFIG.supabaseUrl || SUBMIT_CONFIG.webhookUrl;
+  const canAuto = SUBMIT_CONFIG.supabaseUrl && SUBMIT_CONFIG.supabaseKey;
   if(!canAuto){
     status.className='submit-status ok'; status.textContent=T().savedLocal;
   }
-  // 3) try to send online silently (priority: Supabase -> Power Automate)
-  if(SUBMIT_CONFIG.autoSend && !resultSent){
-    if(SUBMIT_CONFIG.supabaseUrl && SUBMIT_CONFIG.supabaseKey){
-      const ok = await sendToSupabase(payload, true);
-      if(!ok && SUBMIT_CONFIG.webhookUrl){ sendToWebhook(payload, true); }
-    } else if(SUBMIT_CONFIG.webhookUrl){
-      sendToWebhook(payload, true);
-    }
+  // 3) send online silently to Supabase
+  if(SUBMIT_CONFIG.autoSend && !resultSent && canAuto){
+    await sendToSupabase(payload, true);
   }
 }
 
@@ -1378,26 +1307,7 @@ async function submitResult(){
     // if Supabase failed, fall through to other options
   }
 
-  // Next: Power Automate webhook
-  if(SUBMIT_CONFIG.webhookUrl){
-    await sendToWebhook(payload, false);
-    return;
-  }
-
-  // Fallback: open a pre-filled Microsoft Form in a new tab
-  if(SUBMIT_CONFIG.msFormBaseUrl && SUBMIT_CONFIG.msFields.name){
-    const f=SUBMIT_CONFIG.msFields; const params=[];
-    const add=(id,val)=>{ if(id) params.push(encodeURIComponent(id)+'='+encodeURIComponent(val)); };
-    add(f.name,player.name); add(f.dept,player.dept); add(f.location,player.location);
-    add(f.score,score); add(f.correct,correctCount+'/'+TOTAL_Q); add(f.lang,lang);
-    const sep=SUBMIT_CONFIG.msFormBaseUrl.includes('?')?'&':'?';
-    window.open(SUBMIT_CONFIG.msFormBaseUrl+sep+params.join('&'),'_blank');
-    if(_backupId!=null){ const rows=await dbAll(); const row=rows.find(r=>r.id===_backupId); if(row){row.sent=true; await dbUpdate(row);} }
-    status.className='submit-status ok'; status.textContent=t.submitOpened;
-    return;
-  }
-
-  status.className='submit-status err'; status.textContent=t.notConfigured;
+  status.className='submit-status err'; status.textContent=t.submitErr;
   console.log('DX Journey result (configure SUBMIT_CONFIG to send):',payload);
 }
 
@@ -1519,7 +1429,7 @@ async function renderAdmin(){
   if(!rows.length){
     tbl.innerHTML='<tr><td class="admin-empty">'+(lang==='th'?'ยังไม่มีข้อมูลผู้เล่นในเครื่องนี้':'No player data on this device yet')+'</td></tr>';
     // hide resend if no webhook
-    el('admResend').style.display = SUBMIT_CONFIG.webhookUrl ? '' : 'none';
+    el('admResend').style.display = SUBMIT_CONFIG.supabaseUrl ? '' : 'none';
     return;
   }
   const show=rows.slice().reverse().slice(0,100);
@@ -1535,7 +1445,7 @@ async function renderAdmin(){
       '<td>'+(r.score)+'/'+(r.maxScore)+'</td></tr>';
   });
   tbl.innerHTML=html;
-  el('admResend').style.display = SUBMIT_CONFIG.webhookUrl ? '' : 'none';
+  el('admResend').style.display = SUBMIT_CONFIG.supabaseUrl ? '' : 'none';
 }
 
 async function adminResend(){
