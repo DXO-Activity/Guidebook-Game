@@ -376,37 +376,23 @@
 ============================================================ */
 const SUBMIT_CONFIG = {
   // =========================================================
-  //  RESULT DESTINATIONS (priority: Supabase -> Power Automate -> MS Form)
+  //  RESULT DESTINATION — Supabase only
+  //  Results are sent silently to the database when the game ends.
+  //  Players never see a form, so scores cannot be tampered with.
+  //  If Supabase is unreachable, a local backup is kept in the browser.
   // =========================================================
-
-  // ----- Supabase (recommended: silent auto-send, no score tampering) -----
-  // REST endpoint = <project-url>/rest/v1/<table>
   supabaseUrl: "https://rzpbqnjldxivwgjcjdpl.supabase.co",
   supabaseKey: "sb_publishable_gz1GltRJgfnhmNv6WEBOtw_tKn1pCO1",
   supabaseTable: "game_results",
 
-  // Power Automate "When an HTTP request is received" trigger URL.
-  // Looks like: https://prod-XX.westus.logic.azure.com:443/workflows/..../triggers/manual/paths/invoke?...&sig=....
-  webhookUrl: "",
-
-  // If true: result is sent the moment the player reaches the finish screen,
-  // silently in the background (no button press needed). The "Send result"
-  // button still works as a manual retry.
+  // Send automatically the moment the player reaches the finish screen.
   autoSend: true,
 
-  // ----- Fallback only (leave blank if you use Power Automate) -----
-  // Pre-filled Microsoft Form. Opens a new tab with answers filled in;
-  // the player taps Submit themselves.
-  msFormBaseUrl: "https://forms.office.com/Pages/ResponsePage.aspx?id=jReqk-Tj_UCzO2JgtREjRJ7In3r-jyNAo3zZsJ3RRV5UNjZSTDFDT0o4Vk5PMEZCVUZSMElIMklERC4u",
-  msFields: { name:"r1196a9299aa6439bb6dc706d56a2c842", dept:"r8435d36322fd4445aef687bbf6cfcb53", location:"r50b29bc044c241158b660da5658ec780", score:"r52c556578a8a4505985f8b5a16bee787", correct:"r45f41c6f0c4e4970966b5784a33a36cb", lang:"rb9132d90f15340f099e6048a9cf21ca1" },
-
-  // ----- Email backup (opens the player's mail app, pre-filled) -----
-  // A "Email my result" button appears on the finish screen. Clicking it opens
-  // Outlook/mail with the recipient, subject and body already filled — the
-  // player just presses Send.
-  emailEnabled: false,
-  emailTo: "ratklao.chaiyot.9c2@asv.ajinomoto.com",
-  emailSubject: "Game Result- DX Guidebook game"
+  // (unused — kept empty so fallback code stays inert)
+  webhookUrl: "",
+  msFormBaseUrl: "",
+  msFields: { name:"", dept:"", location:"", score:"", correct:"", lang:"" },
+  emailEnabled: false, emailTo: "", emailSubject: ""
 };
 
 /* ============================================================
