@@ -370,29 +370,16 @@
   </div>
 </div></div>
 
+
 <script>
 /* ============================================================
    CONFIG — paste your Microsoft Form / endpoint here
 ============================================================ */
 const SUBMIT_CONFIG = {
-  // =========================================================
-  //  RESULT DESTINATION — Supabase only
-  //  Results are sent silently to the database when the game ends.
-  //  Players never see a form, so scores cannot be tampered with.
-  //  If Supabase is unreachable, a local backup is kept in the browser.
-  // =========================================================
   supabaseUrl: "https://rzpbqnjldxivwgjcjdpl.supabase.co",
   supabaseKey: "sb_publishable_gz1GltRJgfnhmNv6WEBOtw_tKn1pCO1",
   supabaseTable: "game_results",
-
-  // Send automatically the moment the player reaches the finish screen.
-  autoSend: true,
-
-  // (unused — kept empty so fallback code stays inert)
-  webhookUrl: "",
-  msFormBaseUrl: "",
-  msFields: { name:"", dept:"", location:"", score:"", correct:"", lang:"" },
-  emailEnabled: false, emailTo: "", emailSubject: ""
+  autoSend: true
 };
 
 /* ============================================================
