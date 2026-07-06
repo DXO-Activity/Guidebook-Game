@@ -99,7 +99,7 @@
   @keyframes bob{0%,100%{transform:translate(-50%,-90%) translateY(0)}50%{transform:translate(-50%,-90%) translateY(-6px)}}
   .spark{position:absolute;bottom:48px;left:10px;font-size:18px;opacity:0;pointer-events:none}
   .spark.cast{animation:cast .9s ease-out}
-  @keyframes cast{0%{opacity:0;transform:translateY(0) scale(.5)}50%{opacity:1}100%{opacity:0;transform:translateY(-30px) scale(1.3)}}30%{opacity:1}100%{opacity:0;transform:translateY(-34px) scale(1.3)}}
+  @keyframes cast{0%{opacity:0;transform:translateY(0) scale(.5)}50%{opacity:1}100%{opacity:0;transform:translateY(-30px) scale(1.3)}}
 
   .panel{padding:6px 22px 22px}
   .stage-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px}
@@ -1297,7 +1297,6 @@ async function autoSendResult(){
   }
   // 3) Not auto-sending -> prompt the player to press the button.
   status.className='submit-status hint'; status.textContent=T().pressToSend;
-}
 }
 
 async function submitResult(){
