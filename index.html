@@ -172,7 +172,11 @@
   .submit-status{margin-top:14px;font-size:13px;min-height:18px}
   .submit-status.ok{color:var(--moss)}
   .submit-status.err{color:var(--ember)}
-
+  .submit-status.hint{color:var(--rune-glow);font-weight:700}
+  /* draw attention to the Send button until the player presses it */
+  .btn-primary.await-send{animation:sendpulse 1.6s ease-in-out infinite}
+  @keyframes sendpulse{0%,100%{box-shadow:0 8px 20px rgba(52,211,153,.3)}50%{box-shadow:0 8px 28px rgba(52,211,153,.75),0 0 0 4px rgba(52,211,153,.25)}}
+  
   /* ---- Cutscene ---- */
   #cutscene{position:relative;padding:0;min-height:0;display:flex;flex-direction:column}
   .cs-stage{position:relative;flex:1;min-height:300px;overflow:hidden;
@@ -377,7 +381,7 @@ const SUBMIT_CONFIG = {
   supabaseUrl: "https://rzpbqnjldxivwgjcjdpl.supabase.co",
   supabaseKey: "sb_publishable_gz1GltRJgfnhmNv6WEBOtw_tKn1pCO1",
   supabaseTable: "game_results",
-  autoSend: true
+  autoSend: false
 };
 
 /* ============================================================
@@ -497,6 +501,7 @@ const UI = {
     submitting:"กำลังส่งผล...", submitOk:"ส่งผลสำเร็จ! ขอบคุณค่ะ 🎉",
     submitErr:"ส่งออนไลน์ไม่สำเร็จ แต่บันทึกสำรองในเครื่องแล้ว ✓ ลองส่งใหม่ได้",
     savedLocal:"บันทึกผลสำรองในเครื่องแล้ว ✓",
+    pressToSend:"⬇ กดปุ่ม “ส่งผลให้ทีมงาน” ด้านล่างเพื่อบันทึกคะแนนของคุณ",
     admin:"🗄️ ข้อมูลผู้เล่น (Backup)",
     adminTitle:"ฐานข้อมูลสำรองในเครื่องนี้",
     adminCount:(n)=>"เก็บผลผู้เล่นแล้ว "+n+" รายการ",
@@ -532,6 +537,7 @@ const UI = {
     submitErr:"Online send failed, but saved locally ✓. You can retry.",
     savedLocal:"Result backed up on this device ✓",
     admin:"🗄️ Player data (Backup)",
+    pressToSend:"⬇ Press “Send my result” below to submit your score",
     adminTitle:"Local backup database",
     adminCount:(n)=>n+" player results stored",
     adminPending:(n)=>n+" not yet sent online",
@@ -1045,6 +1051,7 @@ function renderFinale(){
     ['<span class="k">'+t.sCorrect+'</span>','<span class="v">'+correctCount+' / '+TOTAL_Q+'</span>']
   ].map(r=>'<div class="row">'+r[0]+r[1]+'</div>').join('');
   el('submitBtn').textContent=t.submit;
+  el('submitBtn').classList.add('await-send');
   autoSendResult();
 }
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -1265,6 +1272,7 @@ async function sendToSupabase(payload, silent){
     status.className='submit-status ok';
     status.textContent = T().submitOk;
     el('submitBtn').disabled = true;
+    el('submitBtn').classList.remove('await-send');
     return true;
   }catch(e){
     if(!silent){ status.className='submit-status err'; status.textContent = T().submitErr; }
@@ -1280,16 +1288,16 @@ async function autoSendResult(){
   const payload = buildPayload();
   // 1) ALWAYS save a local backup first (durable, offline-proof)
   try{ _backupId = await backupSave(payload, false); }catch(e){ _backupId=null; }
-  // 2) show a gentle "backed up" note if nothing is configured to auto-send
+  // 2) OPTIONAL silent auto-send (off by default). The player normally
+  //    presses the "Send my result" button, which is clearer for them.
   const status = el('submitStatus');
-  const canAuto = SUBMIT_CONFIG.supabaseUrl && SUBMIT_CONFIG.supabaseKey;
-  if(!canAuto){
-    status.className='submit-status ok'; status.textContent=T().savedLocal;
-  }
-  // 3) send online silently to Supabase
-  if(SUBMIT_CONFIG.autoSend && !resultSent && canAuto){
+  if(SUBMIT_CONFIG.autoSend && !resultSent && SUBMIT_CONFIG.supabaseUrl && SUBMIT_CONFIG.supabaseKey){
     await sendToSupabase(payload, true);
+    return;
   }
+  // 3) Not auto-sending -> prompt the player to press the button.
+  status.className='submit-status hint'; status.textContent=T().pressToSend;
+}
 }
 
 async function submitResult(){
@@ -1310,7 +1318,7 @@ async function submitResult(){
   console.log('DX Journey result (configure SUBMIT_CONFIG to send):',payload);
 }
 
-
+  
 /* ============================================================
    CUTSCENE ENGINE
 ============================================================ */
