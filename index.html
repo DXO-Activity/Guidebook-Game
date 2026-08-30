@@ -496,12 +496,7 @@ const UI = {
     finaleTextOk:"คุณได้เรียนรู้พฤติกรรมพนักงานทั้ง 4 ระดับของ Digital Transformation ตามแผน Roadmap 2030 แล้ว",
     finalDetail:(m,tq)=>"จาก "+m+" Mana · ผ่าน 5 ด่าน · "+tq+" บททดสอบ",
     sName:"ชื่อ-นามสกุล", sDept:"แผนกและชั้น", sLocation:"สังกัด", sScore:"คะแนน (Mana)", sCorrect:"ตอบถูก",
-    submit:"ส่งผลให้ทีมงาน ⤴", replay:"↻ เล่นใหม่",
-    lockedTitle:"คุณเล่นเกมนี้ไปแล้ว", lockedText:"เกมนี้เล่นได้เพียงครั้งเดียวต่อผู้เล่น ขอบคุณที่ร่วมสนุก!",
-    submitting:"กำลังส่งผล...", submitOk:"ส่งผลสำเร็จ! ขอบคุณค่ะ 🎉",
-    submitErr:"ส่งออนไลน์ไม่สำเร็จ แต่บันทึกสำรองในเครื่องแล้ว ✓ ลองส่งใหม่ได้",
-    savedLocal:"บันทึกผลสำรองในเครื่องแล้ว ✓",
-    pressToSend:"⬇ กดปุ่ม “ส่งผลให้ทีมงาน” ด้านล่างเพื่อบันทึกคะแนนของคุณ",
+    replay:"↻ เล่นใหม่",
     admin:"🗄️ ข้อมูลผู้เล่น (Backup)",
     adminTitle:"ฐานข้อมูลสำรองในเครื่องนี้",
     adminCount:(n)=>"เก็บผลผู้เล่นแล้ว "+n+" รายการ",
@@ -531,13 +526,7 @@ const UI = {
     finaleTextOk:"You've learned the employee behaviors across all 4 levels of Digital Transformation under Roadmap 2030.",
     finalDetail:(m,tq)=>"out of "+m+" Mana · 5 stages · "+tq+" trials",
     sName:"Name-Surname", sDept:"Department & Floor", sLocation:"Location", sScore:"Score (Mana)", sCorrect:"Correct answers",
-    submit:"Send my result ⤴", replay:"↻ Play again",
-    lockedTitle:"You have already played", lockedText:"This game can be played only once per person. Thank you for joining!",
-    submitting:"Sending result...", submitOk:"Result sent! Thank you 🎉",
-    submitErr:"Online send failed, but saved locally ✓. You can retry.",
-    savedLocal:"Result backed up on this device ✓",
-    admin:"🗄️ Player data (Backup)",
-    pressToSend:"⬇ Press “Send my result” below to submit your score",
+    replay:"↻ Play again",
     adminTitle:"Local backup database",
     adminCount:(n)=>n+" player results stored",
     adminPending:(n)=>n+" not yet sent online",
@@ -546,7 +535,6 @@ const UI = {
     clearAll:"🗑 Clear local data",
     clearConfirm:"Clear ALL local backup on this device? (The central Excel is not affected.)",
     adminClose:"Close",
-    resent:(n)=>n+" sent successfully",
   }
 };
 
@@ -1192,7 +1180,7 @@ function downloadCSV(){
 const PLAY_ONCE = false;
 const LOCK_KEY = "dxquest_played_v1";
 function isLocked(){
-  if(!PLAY_ONCE) return false;
+  if(!PLAY_ONCE) return True;
   try{ return localStorage.getItem(LOCK_KEY)!==null; }catch(e){ return window.name==="dxquest_played"; }
 }
 function setLock(info){
